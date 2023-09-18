@@ -227,7 +227,7 @@ class WholeFish(nn.Module):
         return self.net(x)
 
 
-class InterRM_Model(nn.Module):
+class IntModel(nn.Module):
     def __init__(self, input_shape, num_classes, hparams, num_domains, prior_type='conditional'):
         super(InterRM_Model, self).__init__()
         self.hparams = hparams

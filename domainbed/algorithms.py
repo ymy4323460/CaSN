@@ -48,9 +48,9 @@ ALGORITHMS = [
     'IB_IRM',
     'CAD',
     'CondCAD',
-    'InterRM',
-    'InterIRM',
-    'InterRMMMD',
+    'CaSN',
+    'CaSN_IRM',
+    'CaSN_MMD',
 
 ]
 
@@ -128,16 +128,16 @@ class ERM(Algorithm):
         return self.network(x)
 
 
-class InterIRM(ERM):
+class CaSN_IRM(ERM):
     """Interventional Risk Minimization"""
 
     def __init__(self, input_shape, num_classes, num_domains, hparams):
-        super(InterIRM, self).__init__(input_shape, num_classes, num_domains,
+        super(CaSN_IRM, self).__init__(input_shape, num_classes, num_domains,
                                   hparams)
         self.register_buffer('update_count', torch.tensor([0]))
         self.num_domains = num_domains
         self.num_classes = num_classes
-        self.network = networks.InterRM_Model(input_shape, num_classes, self.hparams, self.num_domains)
+        self.network = networks.IntModel(input_shape, num_classes, self.hparams, self.num_domains)
         for i in self.network.parameters():
             i.requires_grad = False
         for i in self.network.intervener.parameters():
@@ -268,16 +268,16 @@ class InterIRM(ERM):
         return self.network(x)[4]
 
 
-class InterRMMMD(ERM):
+class CaSN_MMD(ERM):
     """Interventional Risk Minimization"""
 
     def __init__(self, input_shape, num_classes, num_domains, hparams):
-        super(InterRMMMD, self).__init__(input_shape, num_classes, num_domains,
+        super(CaSN_MMD, self).__init__(input_shape, num_classes, num_domains,
                                   hparams)
         self.register_buffer('update_count', torch.tensor([0]))
         self.num_domains = num_domains
         self.num_classes = num_classes
-        self.network = networks.InterRM_Model(input_shape, num_classes, self.hparams, self.num_domains)
+        self.network = networks.IntModel(input_shape, num_classes, self.hparams, self.num_domains)
         for i in self.network.parameters():
             i.requires_grad = False
         for i in self.network.intervener.parameters():
@@ -435,30 +435,6 @@ class InterRMMMD(ERM):
         (objective + (self.hparams['int_lambda'] * mmd_penalty)).backward()
         self.min_optimizer.step()
 
-#         self.min_optimizer.zero_grad()
-#         L.backward()
-#         self.min_optimizer.step()
-
-
-
-#         for i in enumerate(minibatches):
-#             self.min_optimizer.zero_grad()
-#             loss = self.all_loss(v[i], z[i], y_pred[i], int_y_pred[i], intervention[i], z_c[i], y[i])#v, z, y_pred, int_y_pred, intervention, z_c
-#
-#             for j in range(i, )
-#             L = loss.mean() +
-#             L.backward()
-#             self.min_optimizer.step()
-
-
-#             self.max_optimizer.zero_grad()
-#             loss = self.all_loss(x, y, 'max')
-#             L = loss.mean()
-#             L.backward()
-#             self.max_optimizer.step()
-
-#         self.update_count += 1
-
         return {'loss': objective.item(), 'nll': objective.item(),
             'penalty': objective.item()}
 
@@ -467,16 +443,18 @@ class InterRMMMD(ERM):
 
 
 
-class InterRM(ERM):
+class CaSN(ERM):
     """Interventional Risk Minimization"""
 
     def __init__(self, input_shape, num_classes, num_domains, hparams):
-        super(InterRM, self).__init__(input_shape, num_classes, num_domains,
+        super(CaSN, self).__init__(input_shape, num_classes, num_domains,
                                   hparams)
         self.register_buffer('update_count', torch.tensor([0]))
         self.num_domains = num_domains
         self.num_classes = num_classes
-        self.network = networks.InterRM_Model(input_shape, num_classes, self.hparams, self.num_domains)
+        self.network = networks.IntModel(input_shape, num_classes, self.hparams, self.num_domains)
+        self.max_optimization_step = hparams['max_optimization_step']
+        self.if_adversarial = hparams['if_adversarial']
         for i in self.network.parameters():
             i.requires_grad = False
         for i in self.network.intervener.parameters():
@@ -525,12 +503,6 @@ class InterRM(ERM):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         mean = ((label-scale[0])/(scale[1]-scale[0])).reshape(-1, 1).repeat(1, dim) #torch.ones(label.size()[0], dim)*label
         var = torch.ones(label.size()[0], dim)
-        # print(label)
-#         for i in range(label.size()[0]):
-#             # print(label[i])
-#             mul = (float(label[i])-scale[0])/(scale[1]-0)
-#             mean[i] = torch.ones(dim)*mul
-#             var[i] = torch.ones(dim)*1
         return mean.to(device), var.to(device)
 
     def intervention_loss(self, intervention):
@@ -544,12 +516,10 @@ class InterRM(ERM):
             pm, pv = self.condition_prior([0, self.num_classes], y, m.size()[1])
         else:
             pm, pv = torch.zeros_like(m), torch.ones_like(m)
-        # print(m)
         return self.kl_normal(m, pv * 0.0001, pm, pv * 0.0001)
 
     def all_loss(self, x, y, env_i, turn='min'):
         m, v, z, int_z, y_pred, int_y_pred, intervention, z_c = self.network(x)
-#         print(z_c.size())
         nll = F.cross_entropy(y_pred, y).mean()
         int_nll = -F.cross_entropy(int_y_pred, y).mean()
         kl = self.kl_loss(z, v, y).mean() + self.kl_loss(z_c, v, y).mean()
@@ -560,14 +530,11 @@ class InterRM(ERM):
         if turn == 'min':
             return all + self.hparams['kl_lambda']*kl
         else:
-            return -all - self.hparams['kl_lambda']*kl
+            return -all + self.hparams['kl_lambda']*kl
 
 
     def update(self, minibatches, unlabeled=None):
         device = "cuda" if minibatches[0][0].is_cuda else "cpu"
-#         penalty_weight = (self.hparams['irm_lambda'] if self.update_count
-#                           >= self.hparams['irm_penalty_anneal_iters'] else
-#                           1.0)
         nll = 0.
         penalty = 0.
 
@@ -579,19 +546,21 @@ class InterRM(ERM):
             L.backward()
             self.min_optimizer.step()
 
-#             self.max_optimizer.zero_grad()
-#             loss = self.all_loss(x, y, 'max')
-#             L = loss.mean()
-#             L.backward()
-#             self.max_optimizer.step()
+            if self.if_adversarial == 'adversarial':
+                if  i%self.max_optimization_step == 0 and i>0:
+                    self.max_optimizer.zero_grad()
+                    loss = self.all_loss(x, y, 'max')
+                    L = loss.mean()
+                    L.backward()
+                    self.max_optimizer.step()
 
         self.update_count += 1
 
-        return {'loss': L.cpu().detach().numpy().item(), 'nll': L.cpu().detach().numpy().item(),
-            'penalty': L.cpu().detach().numpy().item()}
+        return {'loss': L.cpu().detach().numpy().item()}
 
     def predict(self, x):
         return self.network(x)[4]
+
 
 
 

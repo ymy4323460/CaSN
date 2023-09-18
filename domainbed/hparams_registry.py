@@ -63,7 +63,9 @@ def _hparams(algorithm, dataset, random_seed):
         _hparam('irm_penalty_anneal_iters', 500,
                 lambda r: int(10**r.uniform(0, 4)))
 
-    elif algorithm == "InterRM":
+    elif algorithm == "CaSN":
+        _hparam('max_optimization_step', 1000, lambda int(r.choice([500, 1000])))
+        _hparam('if_adversarial', 'normal', lambda r.choice(['normal', 'adversarial']))
         _hparam('prior_type', 'conditional',lambda r:'conditional')
         _hparam('int_lambda', 0.001, lambda r: r.choice([0.01, 0.001]))
         _hparam('int_reg', 0.01, lambda r: r.choice([0.1, 0.01]))
@@ -74,7 +76,8 @@ def _hparams(algorithm, dataset, random_seed):
         _hparam('mlp_depth', 3, lambda r: int(r.choice([3])))
         _hparam('mlp_dropout', 0., lambda r: r.choice([0.]))
 
-    elif algorithm == "InterIRM":
+    elif algorithm == "CaSN_IRM":
+        _hparam('max_optimization_step', 1000, lambda int(r.choice([1000])))
         _hparam('irm_lambda', 0.001, lambda r: r.choice([0.001, 0.00001]))
         _hparam('irm_penalty_anneal_iters', 1000,
                 lambda r: int(r.choice([1000])))
@@ -88,7 +91,7 @@ def _hparams(algorithm, dataset, random_seed):
         _hparam('mlp_depth', 3, lambda r: int(r.choice([3])))
         _hparam('mlp_dropout', 0., lambda r: r.choice([0.]))
 
-    elif algorithm == "InterRMMM":
+    elif algorithm == "CaSN_IRM":
         _hparam('prior_type', 'conditional',lambda r:'conditional')
         _hparam('int_lambda', 0.001, lambda r: r.choice([0.01, 0.001]))
         _hparam('int_reg', 0.01, lambda r: r.choice([0.1, 0.01]))
