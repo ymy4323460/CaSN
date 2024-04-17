@@ -229,7 +229,7 @@ class WholeFish(nn.Module):
 
 class IntModel(nn.Module):
     def __init__(self, input_shape, num_classes, hparams, num_domains, prior_type='conditional'):
-        super(InterRM_Model, self).__init__()
+        super(IntModel, self).__init__()
         self.hparams = hparams
         self.num_domains = num_domains
         self.featurizer = Featurizer(input_shape, self.hparams)
